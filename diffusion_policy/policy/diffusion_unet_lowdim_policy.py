@@ -9,6 +9,10 @@ from diffusion_policy.model.common.normalizer import LinearNormalizer
 from diffusion_policy.policy.base_lowdim_policy import BaseLowdimPolicy
 from diffusion_policy.model.diffusion.conditional_unet1d import ConditionalUnet1D
 from diffusion_policy.model.diffusion.mask_generator import LowdimMaskGenerator
+from diffusion_policy.policy.diverse_guidance import (
+    DiverseGuidanceConfig,
+    diverse_guidance_step,
+)
 
 class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
     def __init__(self, 
@@ -49,6 +53,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
         self.obs_as_global_cond = obs_as_global_cond
         self.pred_action_steps_only = pred_action_steps_only
         self.oa_step_convention = oa_step_convention
+        self.diverse_config = kwargs.pop('diverse_guidance_config', None)
         self.kwargs = kwargs
 
         if num_inference_steps is None:
@@ -80,15 +85,31 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             trajectory[condition_mask] = condition_data[condition_mask]
 
             # 2. predict model output
-            model_output = model(trajectory, t, 
+            model_output = model(trajectory, t,
                 local_cond=local_cond, global_cond=global_cond)
 
             # 3. compute previous image: x_t -> x_t-1
+            sample_before = trajectory
             trajectory = scheduler.step(
-                model_output, t, trajectory, 
+                model_output, t, trajectory,
                 generator=generator,
                 **kwargs
                 ).prev_sample
+
+            # 4. (optional) apply diversity guidance
+            if self.diverse_config is not None:
+                alpha_prod_t = scheduler.alphas_cumprod[t.item()]
+                t_norm = t.item() / scheduler.config.num_train_timesteps
+                pred_type = scheduler.config.prediction_type
+                trajectory = diverse_guidance_step(
+                    sample=sample_before,
+                    model_output=model_output,
+                    prev_sample=trajectory,
+                    alpha_prod_t=alpha_prod_t,
+                    t_norm=t_norm,
+                    config=self.diverse_config,
+                    prediction_type=pred_type,
+                )
         
         # finally make sure conditioning is enforced
         trajectory[condition_mask] = condition_data[condition_mask]        
