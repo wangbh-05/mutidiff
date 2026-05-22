@@ -267,38 +267,72 @@ ActPWD $p < 10^{-6}$, ActSucc $p = 0.83$, TrajSucc $p = 0.83$, MeanPathPWD $p < 
 
 \begin{table}[h]
 \centering
-\caption{独立DPP结果（$K=8$, $N=100$）}
-\begin{tabular}{lccc}
+\caption{独立DPP结果（$K=8$, $N=100$），完整表}
+\begin{tabular}{lcccc}
 \toprule
-Config & ActSucc & ActPWD & MeanPathPWD \\
+Config & ActSucc & ActPWD & TrajSucc & MeanPathPWD \\
 \midrule
-Baseline & 0.849 & 63.6 & 93 \\
-DPP $\gamma{=}7\ h{=}1.0$ & 0.812 ns & 111.2$^{***}$ & 107$^{***}$ \\
-\textbf{DPP $\gamma{=}10\ h{=}1.0$} & 0.785 ns & \textbf{133.3}$^{***}$ & \textbf{115}$^{***}$ \\
+Baseline & 0.849 & 63.6 & 0.849 & 93 \\
+DPP $\gamma{=}3\ h{=}1.0$ & 0.846 ns & 71.1$^{***}$ & 0.846 ns & 97 ns \\
+DPP $\gamma{=}3\ h{=}2.0$ & 0.844 ns & 58.7$^{***}$ & 0.844 ns & 91 ns \\
+DPP $\gamma{=}5\ h{=}1.0$ & 0.846 ns & 92.6$^{***}$ & 0.846 ns & 101$^{**}$ \\
+DPP $\gamma{=}5\ h{=}2.0$ & 0.834 ns & 65.0 ns & 0.834 ns & 96 ns \\
+DPP $\gamma{=}7\ h{=}1.0$ & 0.812 ns & 111.2$^{***}$ & 0.812 ns & 107$^{***}$ \\
+DPP $\gamma{=}7\ h{=}2.0$ & 0.853 ns & 75.8$^{***}$ & 0.853 ns & 96 ns \\
+\textbf{DPP $\gamma{=}10\ h{=}1.0$} & 0.785 ns & \textbf{133.3}$^{***}$ & 0.785 ns & \textbf{115}$^{***}$ \\
+DPP $\gamma{=}10\ h{=}2.0$ & 0.845 ns & 91.6$^{***}$ & 0.845 ns & 103$^{**}$ \\
+Temp $\eta{=}1.0$ & 0.792 ns & 43.5$^{***}$ & 0.792 ns & 82$^{**}$ \\
+Noise $\eta{=}0.3$ & 0.849 ns & 63.6 ns & 0.849 ns & 93 ns \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-$K=8$复现了相同规律，ActPWD增益更大（+109\%）。
+$K=8$复现了相同规律，ActPWD增益更大（+109\%）。h=1.0在所有$\gamma$下均
+优于h=2.0，与Batched模式下h=2.0最优形成对比。
 
-\subsection{为何独立DPP优于Batched DPP}
+\subsection{两实验最优参数对比}
 
 \begin{table}[h]
 \centering
-\caption{Batched vs Independent DPP}
-\begin{tabular}{lcc}
+\caption{不同评估协议下的最优参数}
+\begin{tabular}{lccc}
 \toprule
-指标 & Batched DPP（\S2） & Independent DPP（\S3） \\
+ & 实验一 (Batched) & 实验二 (Independent) & 实验二 (Independent) \\
+ & $K=8$ & $K=4$ & $K=8$ \\
 \midrule
-ActPWD $\Delta$ & +21\% & \textbf{+88\%} \\
-Step 1+时DPP的batch内容 & $K$个不同obs & $K$个相同obs \\
-最优$h$ & 2.0 & \textbf{1.0} \\
-TrajSucc $\Delta$ & $-4.6$pp ($p<0.01$) & $-0.7$pp ($p=0.83$) \\
+最优$\gamma$ & 7 & 10 & 10 \\
+最优$h$ & 2.0 & 1.0 & 1.0 \\
+ActPWD增益 & +21\% & +88\% & +109\% \\
+DPP batch内容(step 1+) & $K$个不同obs & $K$个相同obs & $K$个相同obs \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Batched协议中，step 1+将$K$个不同观测混在一个batch中，DPP在不同obs间排斥。独立协议隔离了这一点——DPP始终在同一观测的$K$个action间工作。这既解释了更大的ActPWD增益，也解释了最优$h$从2.0变为1.0。
+Batched模式下DPP在不同观测间排斥，需要更保守的$h=2.0$（仅排斥非常接
+近的样本对）。Independent模式下DPP始终在同一观测的$K$个action间工作，
+可以用更激进的$h=1.0$和更大的$\gamma$，产生更强的多样性增益。
+
+\subsection{为何独立DPP效果更强}
+
+\begin{table}[h]
+\centering
+\caption{Batched vs Independent DPP（完整对比）}
+\begin{tabular}{lccc}
+\toprule
+指标 & Batched（\S2, $K{=}8$） & Independent（\S3, $K{=}4$） & Independent（\S3, $K{=}8$） \\
+\midrule
+ActPWD $\Delta$ & +21\% & \textbf{+88\%} & \textbf{+109\%} \\
+最优$\gamma$ & 7 & 10 & 10 \\
+最优$h$ & 2.0 & 1.0 & 1.0 \\
+DPP batch内容 & $K$个不同obs & $K$个相同obs & $K$个相同obs \\
+TrajSucc $\Delta$ & $-4.6$pp ($p{<}0.01$) & $-0.7$pp ($p{=}0.83$) & $-6.4$pp ($p{=}0.056$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Batched协议}（\S2）：step 1+将$K$个处于不同状态的观测混在一个batch中，DPP在不同观测的action间排斥。不同观测对应的动作本就不同，过强的排斥可能选出不适合当前状态的action。因此需要保守的$h=2.0$和适中的$\gamma=7$。
+
+\textbf{Independent协议}（\S3）：每个环境独立复制自己的观测，DPP始终在同一观测的$K$个action间排斥——所有$K$个action都是面向同一个观测的合法建议。可以用更激进的$h=1.0$（更大范围的排斥）和更大的$\gamma=10$，产生更强的多样性增益。
 
 \subsection{Temperature Scaling（独立，$K=4$）}
 
