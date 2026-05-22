@@ -90,44 +90,47 @@ OSCAR & $X$ & --- & $\tau{=}1.0$ & Gram体积能量（对比） \\
 
 协议A（单环境，执行$a^{(0)}$），$K=8$并行样本。DPP：$h=1.0$（默认），$\omega=0.95$，$t_{\text{gate}} \in [0.05, 1.0]$。全网格$\gamma \times h \times K \times t_{\text{gate}}$共60个配置。每配置$N=200$个action seeds。统计验证：baseline和最优DPP追加到$N=1100$。
 
-\subsection{主要结果（$N=1100$）}
+\subsection{主要结果（$N=700$）}
 
 \begin{table}[h]
 \centering
-\caption{核心结果（$N=1100$）}
-\begin{tabular}{lccccc}
+\caption{核心结果（$N=700$，合并原始200 + 追加500）}
+\begin{tabular}{lcccc}
 \toprule
-指标 & Baseline ($\gamma{=}0$) & DPP ($\gamma{=}7, h{=}2.0$) & $\Delta$ & 95\% CI & $p$ \\
+指标 & Baseline ($\gamma{=}0$) & DPP ($\gamma{=}7, h{=}2.0$) & $\Delta$ & $p$ \\
 \midrule
-ActPWD & $59.3 \pm 0.4$ & $\mathbf{71.7 \pm 0.5}$ & \textbf{+21\%} & --- & $\mathbf{<0.001}^{***}$ \\
-ActSucc & $0.867 \pm 0.010$ & $0.876 \pm 0.010$ & +0.8pp & $[-2.0\text{pp}, +3.6\text{pp}]$ & $0.57$ (ns) \\
+ActPWD & $59.1$ & $\mathbf{70.9}$ & \textbf{+20\%} & $\mathbf{<0.001}^{***}$ \\
+ActSucc & $0.839 \pm 0.014$ & $0.863 \pm 0.013$ & +2.4pp & ns ($p{=}0.16$) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-DPP引导在维持动作成功率不变（$p=0.57$，95\% CI包含零）的同时，\textbf{显著提升动作多样性21\%}（$p<0.001$）。95\% CI下界为$-2.0$pp，达到了严格的\textbf{非劣效性}标准。
+DPP引导在维持动作成功率不变的同时，\textbf{显著提升动作多样性20\%}（$p<0.001$）。
+最强多样性配置$\gamma{=}15, h{=}2.0$：ActPWD=$113.7$（\textbf{+92\%}），
+ActSucc=$0.821$（$-1.7$pp, ns）。
 
-\subsection{Gamma敏感性}
+\subsection{Gamma $\times$ h 完整网格（$N=700$）}
 
 \begin{table}[h]
 \centering
-\caption{$\gamma$敏感性（$K=8$）}
-\begin{tabular}{cccccc}
+\caption{全网格 $\gamma \times h$（$K=8$, $N=700$），Succ / PWD}
+\begin{tabular}{cccccccc}
 \toprule
-$\gamma$ & $h{=}1.0$ ActSucc & $h{=}1.0$ ActPWD & $h{=}2.0$ ActSucc & $h{=}2.0$ ActPWD \\
+$\gamma$ & $h{=}0.5$ Succ & PWD & $h{=}1.0$ Succ & PWD & $h{=}2.0$ Succ & PWD & $h{=}5.0$ Succ & PWD \\
 \midrule
-0 & 0.840 & 58.7 & 0.840 & 58.7 \\
-1 & 0.840 & 55.6 & 0.855 & 55.7 \\
-3 & 0.880 & 66.8 & 0.870 & 55.3 \\
-5 & 0.875 & 87.7 & 0.865 & 59.8 \\
-7 & 0.805 & 108.5 & \textbf{0.900} & \textbf{73.5} \\
-10 & 0.770 & 130.1 & 0.820 & 86.2 \\
-15 & 0.645 & 150.4 & 0.865 & 111.9 \\
+0 (BL) & 0.839 & 59 & 0.839 & 59 & 0.839 & 59 & 0.839 & 59 \\
+1 & 0.830 & 56 & 0.831 & 55 & 0.849 & 56 & 0.837 & 58 \\
+3 & 0.830 & 81 & 0.844 & 67 & 0.850 & 55 & 0.851 & 57 \\
+5 & 0.804 & 106 & 0.844 & 87 & 0.851 & 61 & 0.849 & 56 \\
+7 & 0.766 & 127 & 0.806 & 106 & \textbf{0.863} & \textbf{71} & 0.843 & 55 \\
+10 & 0.687 & 145 & 0.749 & 128 & 0.836 & 86 & 0.850 & 54 \\
+15 & 0.607 & 162 & 0.689 & 151 & 0.821 & 114 & 0.854 & 55 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-ActPWD随$\gamma$单调增长。$h=2.0, \gamma=7$为全局最优（ActSucc 0.900 vs baseline 0.840）。
+仅有$h=2.0$在全$\gamma$范围保持成功率不显著偏离baseline且PWD持续增长。
+$h=0.5/1.0$在高$\gamma$时成功率显著下降。$h=5.0$引导几乎失效（PWD$\approx$55-58）。
 
 \subsection{带宽$h$分析}
 
