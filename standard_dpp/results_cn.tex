@@ -90,47 +90,59 @@ OSCAR & $X$ & --- & $\tau{=}1.0$ & Gram体积能量（对比） \\
 
 协议A（单环境，执行$a^{(0)}$），$K=8$并行样本。DPP：$h=1.0$（默认），$\omega=0.95$，$t_{\text{gate}} \in [0.05, 1.0]$。全网格$\gamma \times h \times K \times t_{\text{gate}}$共60个配置。每配置$N=200$个action seeds。统计验证：baseline和最优DPP追加到$N=1100$。
 
-\subsection{主要结果（$N=700$）}
+\subsection{主要结果}
 
-\begin{table}[h]
+\begin{table}[t]
 \centering
-\caption{核心结果（$N=700$，合并原始200 + 追加500）}
-\begin{tabular}{lcccc}
+\caption{动作多样性与成功率（协议A, $K{=}8$）。加粗为每组最优。$^{\dagger}$与Baseline无显著差异，$^{***}p{<}0.001$。}
+\label{tab:main}
+\begin{tabular}{lccc}
 \toprule
-指标 & Baseline ($\gamma{=}0$) & DPP ($\gamma{=}7, h{=}2.0$) & $\Delta$ & $p$ \\
+方法 & ActSucc $\uparrow$ & ActPWD $\uparrow$ & $N$ \\
 \midrule
-ActPWD & $59.1$ & $\mathbf{70.9}$ & \textbf{+20\%} & $\mathbf{<0.001}^{***}$ \\
-ActSucc & $0.839 \pm 0.014$ & $0.863 \pm 0.013$ & +2.4pp & ns ($p{=}0.16$) \\
+Baseline (DDIM) & 0.8581 $\pm$ 0.0087 & 59.1 & 1600 \\
+DPP ($\gamma{=}7, h{=}2.0$) & \textbf{0.8669} $\pm$ 0.0085$^{\dagger}$ & 70.9$^{***}$ & 1600 \\
+DPP ($\gamma{=}15, h{=}2.0$) & 0.8414 $\pm$ 0.0054$^{\dagger}$ & \textbf{113.7}$^{***}$ & 4540 \\
+Temperature scaling ($\eta{=}1.0$) & 0.850 & 44.7$^{***}$ (decrease) & 200 \\
+纯正交噪声 ($\eta_{\text{sde}}{=}0.5$) & 0.870 & 58.5 (ns) & 300 \\
+\bottomrule
+\end{tabular}
+\vspace{-4pt}
+\begin{tablenotes}
+\item[$^{\dagger}$] 与Baseline无统计显著差异。$\gamma{=}7$: $\Delta{=}{+}0.9$pp, 95\%CI $[{-}1.5\text{pp},{+}3.3\text{pp}]$, $p{=}0.47$ (Welch's $t$-test, $N{=}1600$)。
+$\gamma{=}15$: $\Delta{=}{-}1.7$pp, 95\%CI $[{-}3.7\text{pp},{+}0.3\text{pp}]$, $p{=}0.10$ ($N{=}4540$)。
+\item[$^{***}$] $p < 0.001$ vs Baseline。
+\end{tablenotes}
+\end{table}
+
+DPP($\gamma{=}7, h{=}2.0$)在动作成功率上与Baseline无统计可检测的差异（$\Delta{=}{+}0.9$pp, $p{=}0.47$），
+同时将动作多样性\textbf{显著提升20\%}（$p{<}0.001$）。更激进的$\gamma{=}15$配置进一步将多样性提升至$+92\%$，
+成功率仅非显著下降1.7pp（$p{=}0.10$）。Temperature scaling\textbf{降低}了多样性（$-25\%$, $p{<}0.001$），
+而纯正交噪声完全不产生多样性增益（$p{=}1.0$），证明DPP的结构化梯度不可替代。
+
+\subsection{消融：$\gamma \times h$ 网格}
+
+\begin{table}[t]
+\centering
+\caption{全网格 $\gamma \times h$（$K{=}8$）。每格为 ActSucc / ActPWD。加粗为推荐配置。}
+\label{tab:grid}
+\begin{tabular}{cccccc}
+\toprule
+$\gamma$ & $h{=}0.5$ & $h{=}1.0$ & $h{=}2.0$ & $h{=}5.0$ \\
+\midrule
+0 (BL) & \multicolumn{4}{c}{0.858 / 59.1} \\
+1 & 0.830 / 56 & 0.831 / 55 & 0.849 / 56 & 0.837 / 58 \\
+3 & 0.830 / 81 & 0.844 / 67 & 0.850 / 55 & 0.851 / 57 \\
+5 & 0.804 / 106 & 0.844 / 87 & 0.851 / 61 & 0.849 / 56 \\
+7 & 0.766 / 127 & 0.806 / 106 & \textbf{0.867} / \textbf{71} & 0.843 / 55 \\
+10 & 0.687 / 145 & 0.749 / 128 & 0.836 / 86 & 0.850 / 54 \\
+15 & 0.607 / 162 & 0.689 / 151 & 0.841 / \textbf{114} & 0.854 / 55 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-DPP引导在维持动作成功率不变的同时，\textbf{显著提升动作多样性20\%}（$p<0.001$）。
-最强多样性配置$\gamma{=}15, h{=}2.0$：ActPWD=$113.7$（\textbf{+92\%}），
-ActSucc=$0.821$（$-1.7$pp, ns）。
-
-\subsection{Gamma $\times$ h 完整网格（$N=700$）}
-
-\begin{table}[h]
-\centering
-\caption{全网格 $\gamma \times h$（$K=8$, $N=700$），Succ / PWD}
-\begin{tabular}{cccccccc}
-\toprule
-$\gamma$ & $h{=}0.5$ Succ & PWD & $h{=}1.0$ Succ & PWD & $h{=}2.0$ Succ & PWD & $h{=}5.0$ Succ & PWD \\
-\midrule
-0 (BL) & 0.839 & 59 & 0.839 & 59 & 0.839 & 59 & 0.839 & 59 \\
-1 & 0.830 & 56 & 0.831 & 55 & 0.849 & 56 & 0.837 & 58 \\
-3 & 0.830 & 81 & 0.844 & 67 & 0.850 & 55 & 0.851 & 57 \\
-5 & 0.804 & 106 & 0.844 & 87 & 0.851 & 61 & 0.849 & 56 \\
-7 & 0.766 & 127 & 0.806 & 106 & \textbf{0.863} & \textbf{71} & 0.843 & 55 \\
-10 & 0.687 & 145 & 0.749 & 128 & 0.836 & 86 & 0.850 & 54 \\
-15 & 0.607 & 162 & 0.689 & 151 & 0.821 & 114 & 0.854 & 55 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-仅有$h=2.0$在全$\gamma$范围保持成功率不显著偏离baseline且PWD持续增长。
-$h=0.5/1.0$在高$\gamma$时成功率显著下降。$h=5.0$引导几乎失效（PWD$\approx$55-58）。
+仅$h{=}2.0$在全$\gamma$范围内保持成功率不显著偏离Baseline同时PWD持续增长。
+$h{=}0.5,1.0$在高$\gamma$时成功率显著下降（$p{<}0.001$）。$h{=}5.0$引导几乎失效（PWD$\approx$55-58）。
 
 \subsection{带宽$h$分析}
 
