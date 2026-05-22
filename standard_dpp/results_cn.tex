@@ -1,0 +1,333 @@
+\documentclass[11pt]{article}
+\usepackage[UTF8]{ctex}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\geometry{margin=2.5cm}
+\title{扩散策略多样性引导——实验结果}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{实验设置}
+
+\subsection{任务与模型}
+
+我们在Push-T（扩散策略的标准Benchmark）上评估。圆形推杆（agent）推动T形块（block）覆盖目标区域（$\text{IoU} \geq 0.9$ = 成功）。观测为2帧 $\times$ 20维keypoint坐标（9个block keypoint + agent位置）。动作为8帧 $\times$ 2维agent位移$(dx, dy)$。最大episode长度为300物理帧。
+
+使用预训练的Conditional UNet1D扩散策略（100 DDPM步训练，$\text{test\_mean\_score}=0.969$）。推理时使用DDIM 16步（确定性，$\eta=0$），每次模型前向生成$K$个并行样本。
+
+所有实验使用$\texttt{legacy=True}$物理参数，$\texttt{test\_start\_seed}=100000$。
+
+\subsection{方法变体}
+
+\begin{table}[h]
+\centering
+\caption{实验配置}
+\begin{tabular}{cccccl}
+\toprule
+配置 & $\gamma$ & $h$ & 其他 & 说明 \\
+\midrule
+Baseline & 0 & --- & --- & 标准DDIM，无引导 \\
+DPP $\gamma{=}X\ h{=}Y$ & $X$ & $Y$ & $\omega{=}0.95$ & 本文方法 \\
+Temperature $\eta$ & 0 & --- & DDIM $\eta{=}\eta$ & 随机DDIM \\
+纯噪声 & 0 & --- & $\eta_{\text{sde}}{=}X$ & 随机正交噪声，无DPP梯度 \\
+OSCAR & $X$ & --- & $\tau{=}1.0$ & Gram体积能量（对比） \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+所有DPP配置使用$K$-归一化：$E \leftarrow E/(K-1)$。
+
+\subsection{两种评估协议}
+
+\textbf{协议A——动作多样性（ActPWD）}：单个环境。每一步将当前观测复制$K$次，生成$K$个动作向量。仅执行$a^{(0)}$推进环境。测量“给定同一观测，$K$个动作建议有多不同？”
+
+\textbf{协议B——独立轨迹多样性}：$K$个并行环境，相同初始状态。每一步，每个环境$k$独立将自己的观测复制$K$次，运行DPP引导，执行$a^{(k)}$。产生$K$条真正不同的轨迹。测量“选不同的action是否导致物理上不同的轨迹？”
+
+\subsection{评估指标}
+
+\textbf{动作成对距离（ActPWD）}。给定$K$个动作向量$\mathbf{a}^{(1)}, \dots, \mathbf{a}^{(K)} \in \mathbb{R}^{D}$（$D = n_{\text{action\_steps}} \times d_{\text{action}} = 16$），每步计算：
+\begin{equation}
+\text{PWD}_t = \frac{2}{K(K-1)} \sum_{i=1}^{K} \sum_{j=i+1}^{K} \|\mathbf{a}^{(i)}_t - \mathbf{a}^{(j)}_t\|_2
+\end{equation}
+\begin{equation}
+\text{ActPWD} = \frac{1}{T} \sum_{t=1}^{T} \text{PWD}_t
+\end{equation}
+对$N$个测试种子取平均。度量单个观测下的动作空间多样性。
+
+\textbf{动作成功率（ActSucc）}。block在episode任意时刻覆盖目标区域$\geq 90\%$的比例：
+\begin{equation}
+\text{ActSucc} = \frac{1}{N} \sum_{i=1}^{N} \mathbf{1}\Bigl[\max_t\; \text{IoU}^{(i)}(t) \geq 0.9\Bigr]
+\end{equation}
+协议A中仅$a^{(0)}$进入环境。回答“引导是否破坏了主输出质量？”
+
+\textbf{轨迹成功率（TrajSucc）}（仅协议B）。$K$条并行rollout中成功的比例：
+\begin{equation}
+\text{TrajSucc} = \frac{1}{N} \sum_{i=1}^{N} \frac{1}{K} \sum_{k=1}^{K} \mathbf{1}\Bigl[\max_t\; \text{IoU}^{(i)}_k(t) \geq 0.9\Bigr]
+\end{equation}
+
+\textbf{平均路径成对距离（MeanPathPWD）}（仅协议B）。将$K$条agent轨迹插值到$N_I = 100$个等间距时间点，计算对齐时间点的pairwise L2距离：
+\begin{equation}
+\bar{\mathbf{a}}_k(t) = \text{interp}(\text{agent\_traj}_k, t), \quad t \in [0, 1]
+\end{equation}
+\begin{equation}
+\text{MeanPathPWD} = \frac{1}{N} \sum_{i=1}^{N} \frac{2}{K(K-1)} \sum_{p<q} \mathbb{E}_{t} \|\bar{\mathbf{a}}^{(i)}_p(t) - \bar{\mathbf{a}}^{(i)}_q(t)\|_2
+\end{equation}
+
+\subsection{统计报告}
+
+所有指标报告$\text{mean} \pm \text{SEM}$，$\text{SEM} = \sigma/\sqrt{N}$。组间比较使用Welch独立$t$检验（双侧，除非标注）。显著性：$^{*}p<0.05$, $^{**}p<0.01$, $^{***}p<0.001$。
+
+\section{实验一：动作多样性（协议A，Batched DPP）}
+
+\subsection{设置}
+
+协议A（单环境，执行$a^{(0)}$），$K=8$并行样本。DPP：$h=1.0$（默认），$\omega=0.95$，$t_{\text{gate}} \in [0.05, 1.0]$。全网格$\gamma \times h \times K \times t_{\text{gate}}$共60个配置。每配置$N=200$个action seeds。统计验证：baseline和最优DPP追加到$N=1100$。
+
+\subsection{主要结果（$N=1100$）}
+
+\begin{table}[h]
+\centering
+\caption{核心结果（$N=1100$）}
+\begin{tabular}{lccccc}
+\toprule
+指标 & Baseline ($\gamma{=}0$) & DPP ($\gamma{=}7, h{=}2.0$) & $\Delta$ & 95\% CI & $p$ \\
+\midrule
+ActPWD & $59.3 \pm 0.4$ & $\mathbf{71.7 \pm 0.5}$ & \textbf{+21\%} & --- & $\mathbf{<0.001}^{***}$ \\
+ActSucc & $0.867 \pm 0.010$ & $0.876 \pm 0.010$ & +0.8pp & $[-2.0\text{pp}, +3.6\text{pp}]$ & $0.57$ (ns) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+DPP引导在维持动作成功率不变（$p=0.57$，95\% CI包含零）的同时，\textbf{显著提升动作多样性21\%}（$p<0.001$）。95\% CI下界为$-2.0$pp，达到了严格的\textbf{非劣效性}标准。
+
+\subsection{Gamma敏感性}
+
+\begin{table}[h]
+\centering
+\caption{$\gamma$敏感性（$K=8$）}
+\begin{tabular}{cccccc}
+\toprule
+$\gamma$ & $h{=}1.0$ ActSucc & $h{=}1.0$ ActPWD & $h{=}2.0$ ActSucc & $h{=}2.0$ ActPWD \\
+\midrule
+0 & 0.840 & 58.7 & 0.840 & 58.7 \\
+1 & 0.840 & 55.6 & 0.855 & 55.7 \\
+3 & 0.880 & 66.8 & 0.870 & 55.3 \\
+5 & 0.875 & 87.7 & 0.865 & 59.8 \\
+7 & 0.805 & 108.5 & \textbf{0.900} & \textbf{73.5} \\
+10 & 0.770 & 130.1 & 0.820 & 86.2 \\
+15 & 0.645 & 150.4 & 0.865 & 111.9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+ActPWD随$\gamma$单调增长。$h=2.0, \gamma=7$为全局最优（ActSucc 0.900 vs baseline 0.840）。
+
+\subsection{带宽$h$分析}
+
+DPP高斯核：$L_{ij} = \exp(-h \cdot D_{ij}/\text{median}(D))$。
+$h=0.5$（长程排斥）：ActPWD高但成功率下降。$h=2.0$（最优）：成功率最高，ActPWD适度增加。$h=5.0$（极短程）：PWD $\approx$ baseline，引导失效（$\exp(-5) \approx 0.007$，梯度消失）。
+
+\subsection{Temperature Scaling对比}
+
+\begin{table}[h]
+\centering
+\caption{Temperature Scaling vs DPP}
+\begin{tabular}{lcccc}
+\toprule
+$\eta$ & ActSucc & ActPWD & $\Delta$ PWD & $p$ \\
+\midrule
+0.0 (DDIM) & 0.840 & 57.2 & --- & --- \\
+0.5 & 0.900 & 52.5 & $-8\%$ & $<0.001$ \\
+1.0 (DDPM) & 0.850 & 44.7 & \textbf{$-22\%$} & $<0.001$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Temperature显著降低动作多样性。}DDPM噪声将每个样本推向“平均”路径，抹平了初始噪声差异。
+
+\subsection{纯噪声消融}
+
+\begin{table}[h]
+\centering
+\caption{纯噪声消融}
+\begin{tabular}{lcccc}
+\toprule
+$\eta_{\text{sde}}$ & ActSucc & ActPWD & $p$ (vs baseline) \\
+\midrule
+0.3 & 0.810 & 59.1 & 1.0 \\
+0.5 & 0.870 & 58.5 & 1.0 \\
+1.0 & 0.807 & 58.4 & 1.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+随机正交噪声\textbf{完全不产生多样性增益}（全部$p=1.0$）。DPP的结构化梯度不可替代。
+
+\subsection{K-归一化}
+
+\begin{table}[h]
+\centering
+\caption{K-归一化效果}
+\begin{tabular}{ccc}
+\toprule
+$K$ & 修复前 ActPWD & 修复后 ActPWD \\
+\midrule
+4 & 55.5 & 76.1 ($\gamma{=}5$) \\
+8 & 103.5 & 87.7 ($\gamma{=}5$) \\
+16 & 146.5 & --- \\
+32 & 177.6 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+修复前：$K$从4到32，PWD差异3.2倍。修复后：1.2倍。
+
+\subsection{时间门控}
+
+\begin{table}[h]
+\centering
+\caption{$t_{\text{gate}}^{\text{start}}$ sweep}
+\begin{tabular}{ccc}
+\toprule
+$t_{\text{gate}}^{\text{start}}$ & ActSucc & ActPWD \\
+\midrule
+0.7 & 0.850 & 72.7 \\
+0.8 & 0.870 & 69.7 \\
+\textbf{0.9} & \textbf{0.905} & 65.6 \\
+1.0（始终开启） & 0.840 & 61.7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+关闭前10\%去噪阶段的引导（$t_{\text{norm}} > 0.9$）成功率最优——验证了高噪声时Tweedie估计不可靠的假设。
+
+\subsection{欠拟合模型}
+
+\begin{table}[h]
+\centering
+\caption{欠拟合模型上DPP的效果}
+\begin{tabular}{ccccc}
+\toprule
+Epoch & Baseline Succ & Baseline PWD & DPP Succ & $\Delta$ \\
+\midrule
+160 & 0.430 & 109.9 & 0.310 & \textbf{$-12$pp} \\
+180 & 0.540 & 116.7 & 0.490 & $-5$pp \\
+550（本文） & 0.867 & 59.3 & 0.876 & \textbf{$+0.8$pp} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{DPP引导需要高质量模型。}欠拟合模型baseline PWD $\approx 110$（well-trained的2倍），模型预测噪声大，DPP在错误方向上推开样本。
+
+\section{实验二：独立轨迹多样性（协议B）}
+
+\subsection{动机}
+
+协议A（第2节）中仅$a^{(0)}$进入环境。协议B回答：\textbf{如果真正执行不同的action，轨迹是否真的分叉？}
+
+$K$个并行环境各独立复制自己的观测，运行DPP，执行$a^{(k)}$。第0步所有环境从相同初始状态出发（相同obs）。第1步起观测不同（轨迹已分叉）。\textbf{关键：DPP始终在同一环境内的$K$个相同观测间工作}，隔离了DPP的纯效应。
+
+\subsection{设置}
+
+协议B（$K$个并行环境，执行$a^{(k)}$）。$K=4$（$N=200$ seeds）和$K=8$（$N=100$ seeds）。DPP：$\gamma \in [3, 5, 7, 10]$，$h \in [1.0, 2.0]$，$\omega=0.95$。Temperature：$\eta \in [0.2, 0.5, 0.8, 1.0]$。纯噪声：$\eta_{\text{sde}} \in [0.3, 0.5, 1.0]$。全部原始agent/block轨迹已保存。
+
+\subsection{主要结果——$K=4$ ($N=200$)}
+
+\begin{table}[h]
+\centering
+\caption{独立DPP结果（$K=4$, $N=200$）}
+\begin{tabular}{lcccc}
+\toprule
+Config & ActSucc & ActPWD & TrajSucc & MeanPathPWD \\
+\midrule
+Baseline & 0.819 & 61.5 & 0.819 & 92 \\
+DPP $\gamma{=}5\ h{=}1.0$ & 0.828 ns & 77.2$^{***}$ & 0.828 ns & 99$^{*}$ \\
+DPP $\gamma{=}7\ h{=}1.0$ & 0.816 ns & 93.9$^{***}$ & 0.816 ns & 104$^{***}$ \\
+\textbf{DPP $\gamma{=}10\ h{=}1.0$} & 0.812 ns & \textbf{115.5}$^{***}$ & 0.812 ns & \textbf{109}$^{***}$ \\
+Temp $\eta{=}0.5$ & 0.828 ns & 55.0$^{***}$ & 0.828 ns & 89 ns \\
+Temp $\eta{=}1.0$ & 0.777 ns & 42.2$^{***}$ & 0.777 ns & 77$^{***}$ \\
+Noise $\eta{=}0.3$ & 0.819 ns & 61.5 ns & 0.819 ns & 92 ns \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{关键$p$值（DPP $\gamma{=}10\ h{=}1.0$ vs baseline）：}
+ActPWD $p < 10^{-6}$, ActSucc $p = 0.83$, TrajSucc $p = 0.83$, MeanPathPWD $p < 10^{-4}$。
+
+独立DPP产生\textbf{+88\% ActPWD}和\textbf{+18\% MeanPathPWD}，全部高度显著，同时\textbf{所有成功率指标不变}（全部$p > 0.8$）。
+
+\subsection{主要结果——$K=8$ ($N=100$)}
+
+\begin{table}[h]
+\centering
+\caption{独立DPP结果（$K=8$, $N=100$）}
+\begin{tabular}{lccc}
+\toprule
+Config & ActSucc & ActPWD & MeanPathPWD \\
+\midrule
+Baseline & 0.849 & 63.6 & 93 \\
+DPP $\gamma{=}7\ h{=}1.0$ & 0.812 ns & 111.2$^{***}$ & 107$^{***}$ \\
+\textbf{DPP $\gamma{=}10\ h{=}1.0$} & 0.785 ns & \textbf{133.3}$^{***}$ & \textbf{115}$^{***}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$K=8$复现了相同规律，ActPWD增益更大（+109\%）。
+
+\subsection{为何独立DPP优于Batched DPP}
+
+\begin{table}[h]
+\centering
+\caption{Batched vs Independent DPP}
+\begin{tabular}{lcc}
+\toprule
+指标 & Batched DPP（\S2） & Independent DPP（\S3） \\
+\midrule
+ActPWD $\Delta$ & +21\% & \textbf{+88\%} \\
+Step 1+时DPP的batch内容 & $K$个不同obs & $K$个相同obs \\
+最优$h$ & 2.0 & \textbf{1.0} \\
+TrajSucc $\Delta$ & $-4.6$pp ($p<0.01$) & $-0.7$pp ($p=0.83$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Batched协议中，step 1+将$K$个不同观测混在一个batch中，DPP在不同obs间排斥。独立协议隔离了这一点——DPP始终在同一观测的$K$个action间工作。这既解释了更大的ActPWD增益，也解释了最优$h$从2.0变为1.0。
+
+\subsection{Temperature Scaling（独立，$K=4$）}
+
+\begin{table}[h]
+\centering
+\caption{独立协议下的Temperature Scaling}
+\begin{tabular}{cccc}
+\toprule
+$\eta$ & ActPWD & MeanPathPWD & ActSucc \\
+\midrule
+0.0 & 61.5 & 92 & 0.819 \\
+0.5 & 55.0 & 89 & 0.828 \\
+1.0 & \textbf{42.2} & \textbf{77} & 0.777 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Temperature单调降低动作多样性（$-31\%$）和轨迹多样性（$-16\%$），再次确认随机噪声不是DPP的替代品。
+
+\section{核心发现总结}
+
+\begin{enumerate}
+\item \textbf{DPP显著增加动作多样性。}两个协议下+21\%（batched, $p<0.001$）和+88\%（independent, $p<10^{-6}$）。
+\item \textbf{DPP保持动作成功率。}$N=1100$下95\% CI $[-2.0\text{pp}, +3.6\text{pp}]$（$p=0.57$），达到非劣效性。
+\item \textbf{DPP显著增加轨迹多样性。}独立协议下MeanPathPWD +18\%（$p<10^{-4}$）。
+\item \textbf{Temperature scaling降低多样性。}$\eta=1.0$时ActPWD $-31\%$（$p<10^{-6}$）。
+\item \textbf{纯随机噪声无效。}三个噪声水平的$p=1.0$，DPP结构化梯度不可替代。
+\item \textbf{$K$-归一化$E/(K-1)$必要。}修复了$3.2\times$的跨$K$ PWD差异。
+\item \textbf{引导需要高质量模型。}欠拟合模型上DPP反而降低成功率（$-12$pp）。
+\end{enumerate}
+
+\end{document}
