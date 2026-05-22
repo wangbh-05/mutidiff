@@ -429,7 +429,44 @@ $\hat{A}_0$ 不可靠 → 基于不可靠 $\hat{A}_0$ 的 DPP 多样性梯度在
 
 ---
 
-### 4.11 轨迹分叉验证（支持性证据）
+### 4.11 Independent Per-Env DPP — 严格验证（新增）
+
+**动机**：原始 TrajDiversity 在 step 1+ 将 K 个不同 obs 混在 batch 中，
+DPP 在不同 obs 间排斥，混杂了"选不同 action"和"DPP 在异 obs 上的行为"两个效应。Independent DPP 让每个 env 独立运行
+"same obs → K actions with DPP → pick action[k]"，确保 DPP 始终在
+同一观测的 K 个 action 间工作。
+
+**方法**：K 个并行环境，env_k 永远执行 action[k]。每一步：
+env_k 复制自己的 obs K 次 → 独立推理 → DPP 在 K 个相同 obs 的 action 间排斥 → 选 action[k] 执行。
+
+**K=4 (N=200)**：
+
+| Config | ActSucc | ActPWD | TrajSucc | MeanPathPWD |
+|--------|---------|--------|----------|-------------|
+| Baseline | 0.819 | 61.5 | 0.819 | 92 |
+| **DPP γ=7 h=1.0** | 0.816 ns | **93.9** *** | 0.816 ns | **104** *** |
+| **DPP γ=10 h=1.0** | 0.812 ns | **115.5** *** | 0.812 ns | **109** *** |
+| DPP γ=5 h=1.0 | 0.828 ns | 77.2 *** | 0.828 ns | 99 * |
+| TEMP η=1.0 | 0.777 ns | 42.2 *** | 0.777 ns | 77 *** |
+| NOISE η=0.3 | 0.819 ns | 61.5 ns | 0.819 ns | 92 ns |
+
+**K=8 (N=100)**：
+
+| Config | ActSucc | ActPWD | MeanPathPWD |
+|--------|---------|--------|-------------|
+| Baseline | 0.849 | 63.6 | 93 |
+| **DPP γ=7 h=1.0** | 0.812 ns | **111.2** *** | **107** *** |
+| **DPP γ=10 h=1.0** | 0.785 ns | **133.3** *** | **115** *** |
+
+**精确 p 值（K=4, γ=10 h=1.0 vs baseline）**：
+ActPWD p<10⁻⁶, ActSucc p=0.83, MeanPathPWD p<10⁻⁴。
+
+**核心结论**：
+1. Independent DPP 效果比 batched TrajDiversity **更强**：
+   ActPWD +53%~+88%（K=4）vs 之前的 +21%（K=8, batched）
+2. h=1.0 在独立模式下最优（和 batched 模式的 h=2.0 不同）
+3. Temperature scaling **显著降低**多样性（ActPWD −31%, p<10⁻⁶）
+4. 纯噪声 p=1.0 —— 完全无法替代 DPP 结构化梯度
 
 修正的 Trajectory Diversity 评估验证了 DPP 产生了真正不同的轨迹——K 个并行环境
 各自执行 action[k] 后，agent 路径从 step 1 开始分叉。Push-T 任务的 block 终点
